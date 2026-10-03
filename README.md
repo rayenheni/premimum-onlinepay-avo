@@ -11,6 +11,7 @@ A polished Arabic/French, RTL/LTR website template for **one lawyer or one law f
 - Consultation workflow with Konnect, bank-transfer and D17 options
 - Server-side validation, hashed admin sessions, audit log and secure uploaded-media delivery
 - Original template images in `public/images`
+- Arabic/Tunisian motion-graphic promo page at `/ar/promo` with a 30-second scene loop, controls and ready-to-record voice-over script
 
 ## New installation
 

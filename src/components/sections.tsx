@@ -30,7 +30,7 @@ export function Hero({ locale, config, content }: { locale: Locale; config: Publ
         <div className="hero-eyebrow"><span /><p>{t.hero.label}</p></div>
         <h1>{t.hero.title.split("\n").map((line, index) => <span key={line}>{index > 0 && <br />}{line}</span>)}</h1>
         <p className="hero-description">{t.hero.description}</p>
-        <div className="hero-buttons">{config.pages.contact.enabled && <Link href={`/${locale}/contact`} className="hero-primary">{t.hero.contact}</Link>}{config.pages.about.enabled && <Link href={`/${locale}/about`} className="hero-secondary">{t.hero.more}</Link>}</div>
+        <div className="hero-buttons">{config.pages.contact.enabled && <Link href={`/${locale}/contact`} className="hero-primary">{t.hero.contact}</Link>}{config.pages.about.enabled && <Link href={`/${locale}/about`} className="hero-secondary">{t.hero.more}</Link>}<Link href={`/${locale}/promo`} className="hero-promo-link">{locale === "ar" ? "شوفوا الفيديو" : "Voir la vidéo"}</Link></div>
       </div>
       <HeroVideo locale={locale} config={config} content={content} />
     </div>
