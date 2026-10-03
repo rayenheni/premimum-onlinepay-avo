@@ -1,80 +1,98 @@
-# Cabinet Abou Yahia Labbaoui
+# Bilingual law-firm website template
 
-A Next.js App Router website with French and Arabic, PostgreSQL, and Drizzle ORM. The presentation recreates the supplied Alhalees reference layout: transparent / sticky navigation, full-height office hero, monochrome ribbon, framed office image, brown/gold statistics panels, seven-step sticky timeline, and two practice panels.
+A polished Arabic/French, RTL/LTR website template for **one lawyer or one law firm per deployment**. Each customer receives an independent application, database, administrator account, and payment credentials. It is not a shared multi-tenant SaaS platform.
 
-## Languages and interaction
+## Included
 
-- `/` and `/ar`: Arabic, RTL.
-- `/fr`: French, LTR.
-- Services open detailed bilingual views.
-- Search filters services and articles, including accent- and Arabic-diacritic-insensitive matching.
-- Consultation, contact, and spontaneous career application forms persist to PostgreSQL.
-- Dialogs support Escape, focus trapping, focus restoration, and reduced-motion preferences.
+- Arabic (`/ar`, RTL) and French (`/fr`, LTR) public website
+- Responsive homepage, firm profile, services, journal, gallery, contact, careers, legal, privacy and search pages
+- PostgreSQL-backed CMS for public text, SEO, pages, articles, media, contact requests and consultation requests
+- One protected administration area at `/admin`
+- Consultation workflow with Konnect, bank-transfer and D17 options
+- Server-side validation, hashed admin sessions, audit log and secure uploaded-media delivery
+- Original template images in `public/images`
 
-## Payment activation
+## New installation
 
-Set server-only `KONNECT_API_KEY`, `KONNECT_WALLET_ID`, and `SITE_URL`. Set `KONNECT_ENV=sandbox` for tests or `production` for live payments. No credentials are hardcoded or exposed to clients. `.env.example` lists the configuration names; do not overwrite the existing database environment.
+### 1. Requirements
 
-The checkout uses the documented Konnect v2 endpoints. Prices are 90, 150, and 250 TND; amounts sent to the provider are multiplied by 1000 to convert dinars into millimes. Supported payment selections are bank card, e-Dinar, and Konnect wallet. Update the approved tariff options and server allowlist together if prices change.
+- Node.js 22 or newer
+- PostgreSQL 15 or newer
+- A database dedicated to this customer
 
-Without merchant credentials, booking requests are saved with `awaiting_confirmation`. The UI explicitly states that payment is disabled and no money has been charged. Provider errors save a request as `payment_unavailable`. Only a server-verified completed payment with matching order, receiving wallet, TND currency and reached amount updates the request to `paid`.
+### 2. Configure the installation
 
-`GET /api/payments/konnect?payment_ref=...` is the callback. It independently verifies provider status. Browser requests return to the localized homepage; server callbacks receive JSON. `/api/payments/status` returns only the public reference, status and amount, not client personal data. No confirmation emails are claimed or sent in this version.
+```bash
+cp .env.example .env
+```
 
-## Database
+Set at least `DATABASE_URL`, `SITE_URL`, and a long random `ADMIN_SETUP_KEY`. In production, `ADMIN_SETUP_KEY` is mandatory before the first admin account can be created.
 
-- `consultation_requests`: client request, preferred date, format amount, chosen payment method and verified payment state.
-- `cabinet_inquiries`: contact messages and spontaneous career applications.
+### 3. Install and initialise the database
 
-Use Drizzle for access. In a prepared environment, apply the schema with `npx drizzle-kit push`. The platform health endpoint is `/api/health`.
+```bash
+npm install
+npm run db:migrate
+npm run dev
+```
 
-## Approved business content
+Open `http://localhost:3000/admin`, enter the setup key, and create the administrator account. The setup screen is available only while no administrator exists.
 
-Contact details and WhatsApp are optional server configuration values (`CABINET_EMAIL`, `CABINET_PHONE`, `CABINET_WHATSAPP`). No invented telephone number or physical street address is displayed when they are absent.
+For a development database without migration history, `npx drizzle-kit push` is also available. Use the committed migrations for production installations.
 
-Visuals are original: the office, scales and article photographs are AI-generated, the intro video and its poster come from Pexels (free licence), and the typeface is IBM Plex Sans Arabic (SIL Open Font License). Website copy is original wording; no text, fonts, images or statistics are taken from the design reference. The "in numbers" section lists factual service characteristics only.
+### 4. Configure the firm
+
+Sign in at `/admin` and update, in this order:
+
+1. **Tous les textes** — firm name, lawyer name, practice descriptions, legal wording, consultation fees and bilingual copy.
+2. **Logo & apparence** — logo, cover images and optional licensed video.
+3. **Paramètres** — contact information, hours, social links, notifications and SEO indexing.
+4. **Paiements** — enable only the methods accepted by this firm and enter bank/D17 details where applicable.
+5. **Pages & SEO** — control publication, navigation and page metadata.
+
+Default content is intentionally generic. Every customer should review their legal notices, privacy content, service scope and fees before publishing.
+
+## Payments
+
+### Konnect
+
+Set all three server variables below to enable online checkout:
+
+- `KONNECT_API_KEY`
+- `KONNECT_WALLET_ID`
+- `SITE_URL`
+
+`SITE_URL` must be the firm’s canonical public URL and must use HTTPS in production. The server independently verifies the completed payment, TND currency, order reference, receiving wallet, and reached amount before marking a consultation as paid.
+
+### Bank transfer and D17
+
+These methods are manual by design. The client provides a transaction reference **and uploads a payment receipt** (JPG, PNG, WebP or PDF; 5 MB maximum). The receipt is stored privately, the request is set to `awaiting_verification`, and the firm opens the proof in **Admin → Consultations** before choosing **Accepter la preuve et marquer payé**. Proof files are never exposed through the public media route.
+
+## Media and assets
+
+The bundled office, justice and article visuals are template images. Replace them from **Admin → Médiathèque & galerie** or use a licensed external HTTPS URL. An introductory video is not bundled; adding one is optional and must be properly licensed.
+
+Uploaded JPG, PNG and WebP images are limited to 5 MB and their binary signature is checked server-side before storage.
+
+## Security and operations
+
+- Keep `.env` out of version control.
+- Run the site behind HTTPS.
+- Configure your reverse proxy/CDN to overwrite `x-real-ip`; use CDN/WAF rate limiting in addition to the in-memory form guard.
+- Back up PostgreSQL regularly. The admin interface includes content exports, but database backups remain essential.
+- Do not share Konnect, Resend, database, or setup credentials with template buyers outside their own deployment.
 
 ## Validation
 
-Run `npx next typegen`, `npm exec tsc -- --noEmit --pretty false`, and `npm run build`, followed by the platform-managed `build_and_start` tool.
+```bash
+npm run typecheck
+npm run lint
+npm run build
+npm run test:e2e
+```
 
-## Full CMS administration
+The E2E suite needs a running PostgreSQL database defined by `DATABASE_URL` and a started application (`PLAYWRIGHT_BASE_URL`, default `http://127.0.0.1:3000`).
 
-The administration is a database-backed CMS. Its public path is read from `ADMIN_PATH` for first deployment and can then be changed in **Paramètres → Adresse privée**. The internal `/admin` route is hidden after a custom path is selected. This is defence-in-depth only; access is still enforced by an HTTP-only session and password checks on every admin page and action.
+## Selling the template
 
-The admin controls:
-- Every public string and number in Arabic and French, with automatic revisions and restore/reset actions.
-- Page publication, menu visibility and page-level SEO title/description.
-- Logo and all major image slots, the intro video, social links and the public gallery.
-- PostgreSQL-stored media uploads (JPG/PNG/WebP, 5 MB maximum) with bilingual alt text and captions.
-- Articles, consultations, contact messages and applications.
-- Consultation tariffs, durations, office hours and appointment slot duration.
-- Public contact details, notification address, SEO indexing and private admin path.
-- CSV exports for consultations/messages, a JSON CMS backup, and an immutable audit trail of admin changes.
-
-Optional e-mail delivery uses the Resend HTTP API through `RESEND_API_KEY` and `EMAIL_FROM`. Requests still persist safely if e-mail delivery is not configured or temporarily fails.
-
-
-
-## Multi-tenant platform (sell to several lawyers)
-
-Every lawyer's website is a **tenant**. The tenant is resolved from the request host: a custom domain (`cabinet-xyz.tn`) or a platform subdomain (`cabinet-xyz.plateforme.tn`, configurable with `PLATFORM_DOMAIN`). The main domain and local previews fall back to `DEFAULT_TENANT_SLUG`.
-
-All content, media, pages, settings, consultation requests, messages, articles and revisions are tenant-scoped, so one cabinet can never read another's data. Suspended tenants stop resolving to their site.
-
-The first administrator created through `/admin` becomes the **platform owner** for the default tenant and gets a "Sites clients" section. Creating a site asks for the cabinet name (AR/FR), an identifier, an administrator e-mail and an optional custom domain. It creates the tenant plus its own administrator account and displays a **one-time temporary password** that must be passed to the lawyer and is never shown again. Each tenant's administrator only manages their own site; the tenant manager is not visible to them.
-
-A new tenant starts with the shared default bilingual content, default page states and the shared built-in images. Payment methods are per tenant and must be enabled by that tenant's administrator before clients can use them.
-
-## Payment methods: bank transfer and D17
-
-Alongside Konnect (card, e-Dinar, wallet), each tenant can enable:
-
-- **Virement bancaire** — bank name, beneficiary, RIB and bilingual instructions, shown to the client after selection.
-- **D17 (La Poste Tunisienne)** — payment number, optional merchant code and bilingual instructions.
-
-For both, the client must enter a **transaction reference** (4–120 characters, letters/digits/`.`/`/`/space). The request is saved with status `awaiting_verification` and the reference; **no money is moved by the site**. The cabinet then verifies the reference in its bank statement or e-Dinar/D17 account and clicks "Vérifier et marquer payé" in Consultations, which sets the status to `paid` and records `verifiedAt`.
-
-D17 merchant payments are settled through the La Poste/e-Dinar merchant account; there is no public self-serve verification API, so verification is intentionally manual and the admin UI states this. Konnect remains the only automatically verified method. Payment methods, RIB format and phone format are validated server-side, and only methods enabled for the tenant are accepted.
-
-# premium-onlinepay-avo
+License the template for one law firm and one deployment per purchase. Hosting, branding, content entry, payment configuration, support and future custom work should be offered as separate services.

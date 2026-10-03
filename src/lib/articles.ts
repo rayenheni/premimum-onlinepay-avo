@@ -1,8 +1,7 @@
-import { and, count, desc, eq } from "drizzle-orm";
-import { db } from "@/db";
+import { count, desc, eq } from "drizzle-orm";
+import { databaseConfigured, db } from "@/db";
 import { articles, siteSettings } from "@/db/schema";
 import { siteContent, type Locale } from "@/lib/site-content";
-import { getTenant } from "@/lib/tenant";
 
 export type ArticleView = {
   id: number;
@@ -26,11 +25,17 @@ async function ensureSeed() {
       const ar = siteContent.ar.blog.articles[index];
       const fr = siteContent.fr.blog.articles[index];
       return {
-        slug, image: ar.image, published: true,
-        categoryAr: ar.category, categoryFr: fr.category,
-        titleAr: ar.title, titleFr: fr.title,
-        excerptAr: ar.excerpt, excerptFr: fr.excerpt,
-        bodyAr: ar.paragraphs.join("\n\n"), bodyFr: fr.paragraphs.join("\n\n"),
+        slug,
+        image: ar.image,
+        published: true,
+        categoryAr: ar.category,
+        categoryFr: fr.category,
+        titleAr: ar.title,
+        titleFr: fr.title,
+        excerptAr: ar.excerpt,
+        excerptFr: fr.excerpt,
+        bodyAr: ar.paragraphs.join("\n\n"),
+        bodyFr: fr.paragraphs.join("\n\n"),
       };
     })).onConflictDoNothing();
   }
@@ -40,7 +45,10 @@ async function ensureSeed() {
 function toView(row: typeof articles.$inferSelect, locale: Locale): ArticleView {
   const pick = (ar: string | null, fr: string | null) => (locale === "ar" ? ar || fr : fr || ar) || "";
   return {
-    id: row.id, slug: row.slug, image: row.image, createdAt: row.createdAt,
+    id: row.id,
+    slug: row.slug,
+    image: row.image,
+    createdAt: row.createdAt,
     category: pick(row.categoryAr, row.categoryFr),
     title: pick(row.titleAr, row.titleFr),
     excerpt: pick(row.excerptAr, row.excerptFr),
@@ -49,10 +57,10 @@ function toView(row: typeof articles.$inferSelect, locale: Locale): ArticleView 
 }
 
 export async function listArticles(locale: Locale, limit?: number): Promise<ArticleView[]> {
+  if (!databaseConfigured) return [];
   try {
     await ensureSeed();
-    const tenant = await getTenant();
-    const query = db.select().from(articles).where(and(eq(articles.tenantId, tenant?.id ?? 1), eq(articles.published, true))).orderBy(desc(articles.createdAt));
+    const query = db.select().from(articles).where(eq(articles.published, true)).orderBy(desc(articles.createdAt));
     const rows = limit ? await query.limit(limit) : await query;
     return rows.map((row) => toView(row, locale));
   } catch (error) {
@@ -62,9 +70,8 @@ export async function listArticles(locale: Locale, limit?: number): Promise<Arti
 }
 
 export async function getArticleBySlug(locale: Locale, slug: string): Promise<ArticleView | null> {
-  if (!/^[a-z0-9-]{1,120}$/.test(slug)) return null;
+  if (!databaseConfigured || !/^[a-z0-9-]{1,120}$/.test(slug)) return null;
   await ensureSeed();
-  const tenant = await getTenant();
-  const [row] = await db.select().from(articles).where(and(eq(articles.tenantId, tenant?.id ?? 1), eq(articles.slug, slug))).limit(1);
+  const [row] = await db.select().from(articles).where(eq(articles.slug, slug)).limit(1);
   return row && row.published ? toView(row, locale) : null;
 }

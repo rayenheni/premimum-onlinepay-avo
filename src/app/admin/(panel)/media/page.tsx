@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { desc, eq } from "drizzle-orm";
+import { desc } from "drizzle-orm";
 import { db } from "@/db";
 import { mediaAssets } from "@/db/schema";
 import { deleteMedia, updateMedia, uploadMedia } from "@/app/admin/actions";
@@ -8,8 +8,8 @@ import { requireAdmin } from "@/lib/auth";
 import { formatDate } from "@/lib/admin-labels";
 
 export default async function MediaPage({ searchParams }: { searchParams: Promise<{ uploaded?: string; error?: string }> }) {
-  const admin = await requireAdmin();
-  const [query, assets] = await Promise.all([searchParams, db.select({ id: mediaAssets.id, filename: mediaAssets.filename, mimeType: mediaAssets.mimeType, size: mediaAssets.size, altAr: mediaAssets.altAr, altFr: mediaAssets.altFr, captionAr: mediaAssets.captionAr, captionFr: mediaAssets.captionFr, showInGallery: mediaAssets.showInGallery, createdAt: mediaAssets.createdAt }).from(mediaAssets).where(eq(mediaAssets.tenantId, admin.tenantId)).orderBy(desc(mediaAssets.createdAt))]);
+  await requireAdmin();
+  const [query, assets] = await Promise.all([searchParams, db.select({ id: mediaAssets.id, filename: mediaAssets.filename, mimeType: mediaAssets.mimeType, size: mediaAssets.size, altAr: mediaAssets.altAr, altFr: mediaAssets.altFr, captionAr: mediaAssets.captionAr, captionFr: mediaAssets.captionFr, showInGallery: mediaAssets.showInGallery, createdAt: mediaAssets.createdAt }).from(mediaAssets).orderBy(desc(mediaAssets.createdAt))]);
   return <>
     <header className="adm-header"><div><h1>Médiathèque & galerie</h1><p>Importez vos propres images, ajoutez les textes alternatifs et choisissez celles de la galerie publique.</p></div></header>
     {query.uploaded && <p className="adm-success">Image importée.</p>}{query.error && <p className="adm-error">{query.error === "used" ? "Cette image est utilisée par un article. Modifiez d’abord l’image de l’article." : "Fichier refusé. Formats acceptés : JPG, PNG ou WebP, 5 Mo maximum."}</p>}

@@ -1,24 +1,26 @@
 import { requireAdmin } from "@/lib/auth";
 import Link from "next/link";
-import { and, count, desc, eq, sql } from "drizzle-orm";
+import { count, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { articles, cabinetInquiries, consultationRequests } from "@/db/schema";
 import { adminHref } from "@/lib/admin-path";
 import { consultationStatuses, formatDate, serviceLabel } from "@/lib/admin-labels";
 
 export default async function DashboardPage() {
-  const admin = await requireAdmin();
+  await requireAdmin();
   const base = await adminHref();
   const [[total], [pending], [paid], [messages], [published], recent, recentMessages] = await Promise.all([
-    db.select({ value: count() }).from(consultationRequests).where(eq(consultationRequests.tenantId, admin.tenantId)),
-    db.select({ value: count() }).from(consultationRequests).where(and(eq(consultationRequests.tenantId, admin.tenantId), eq(consultationRequests.status, "awaiting_confirmation"))),
-    db.select({ value: count() }).from(consultationRequests).where(and(eq(consultationRequests.tenantId, admin.tenantId), eq(consultationRequests.status, "paid"))),
-    db.select({ value: count() }).from(cabinetInquiries).where(and(eq(cabinetInquiries.tenantId, admin.tenantId), eq(cabinetInquiries.status, "new"))),
-    db.select({ value: count() }).from(articles).where(and(eq(articles.tenantId, admin.tenantId), eq(articles.published, true))),
-    db.select().from(consultationRequests).where(eq(consultationRequests.tenantId, admin.tenantId)).orderBy(desc(consultationRequests.createdAt)).limit(5),
-    db.select().from(cabinetInquiries).where(eq(cabinetInquiries.tenantId, admin.tenantId)).orderBy(desc(cabinetInquiries.createdAt)).limit(5),
+    db.select({ value: count() }).from(consultationRequests),
+    db.select({ value: count() }).from(consultationRequests).where(eq(consultationRequests.status, "awaiting_confirmation")),
+    db.select({ value: count() }).from(consultationRequests).where(eq(consultationRequests.status, "paid")),
+    db.select({ value: count() }).from(cabinetInquiries).where(eq(cabinetInquiries.status, "new")),
+    db.select({ value: count() }).from(articles).where(eq(articles.published, true)),
+    db.select().from(consultationRequests).orderBy(desc(consultationRequests.createdAt)).limit(5),
+    db.select().from(cabinetInquiries).orderBy(desc(cabinetInquiries.createdAt)).limit(5),
   ]);
-  const [revenue] = await db.select({ value: sql<number>`coalesce(sum(${consultationRequests.amount}), 0)` }).from(consultationRequests).where(and(eq(consultationRequests.tenantId, admin.tenantId), eq(consultationRequests.status, "paid")));
+  const [revenue] = await db.select({ value: sql<number>`coalesce(sum(${consultationRequests.amount}), 0)` })
+    .from(consultationRequests)
+    .where(eq(consultationRequests.status, "paid"));
   const cards = [
     { label: "Demandes de consultation", value: total.value, href: `${base}/consultations` },
     { label: "À confirmer", value: pending.value, href: `${base}/consultations` },

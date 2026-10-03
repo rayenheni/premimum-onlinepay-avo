@@ -1,88 +1,72 @@
-import 'dotenv/config';
-import { test, expect } from '@playwright/test';
-import { and, eq } from 'drizzle-orm';
-import { db, pool } from '../src/db';
-import { adminUsers, consultationRequests, siteSettings, tenants } from '../src/db/schema';
+import "dotenv/config";
+import { test, expect } from "@playwright/test";
+import { eq } from "drizzle-orm";
+import { db, pool } from "../src/db";
+import { consultationRequests, paymentProofs, siteSettings } from "../src/db/schema";
 
-const email = `e2e-pt-${Date.now()}@example.tn`;
-const password = 'Payments-Test-2026!';
-const slug = `e2e-cab-${Date.now().toString(36)}`;
-const tenantHost = `${slug}.${process.env.PLATFORM_DOMAIN || 'plateforme.tn'}`;
-let adminId = 0;
-let tenantId = 0;
+const email = `e2e-payment-${Date.now()}@example.tn`;
+const pngReceipt = { name: "receipt.png", mimeType: "image/png", buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]) };
+
+async function setting(key: string, value: string) {
+  await db.insert(siteSettings).values({ key, value }).onConflictDoUpdate({ target: siteSettings.key, set: { value } });
+}
 
 test.beforeAll(async () => {
-  const [{ id }] = await db.insert(tenants).values({ slug, nameAr: 'مكتب تجريبي', nameFr: 'Cabinet de test', adminEmail: email }).returning({ id: tenants.id });
-  tenantId = id;
-  const { scryptSync, randomBytes } = await import('node:crypto');
-  const salt = randomBytes(16);
-  const [admin] = await db.insert(adminUsers).values({
-    tenantId: id, email,
-    passwordHash: `scrypt$${salt.toString('hex')}$${scryptSync(password, salt, 64).toString('hex')}`,
-    isPlatform: false,
-  }).returning({ id: adminUsers.id });
-  adminId = admin.id;
-  // Each tenant configures its own payment methods, like a real lawyer would.
-  await db.insert(siteSettings).values({ tenantId: id, key: 'paymentMethods', value: '["card","edinar","konnect","bank_transfer","d17"]' });
+  await Promise.all([
+    setting("paymentMethods", '["bank_transfer","d17"]'),
+    setting("bank.rib", "00 000 0000000000000 00"),
+    setting("d17.phone", "+216 20 111 222"),
+  ]);
 });
 
 test.afterAll(async () => {
-  await db.transaction(async (tx) => {
-    if (tenantId) {
-      await tx.delete(consultationRequests).where(eq(consultationRequests.tenantId, tenantId));
-      await tx.delete(adminUsers).where(eq(adminUsers.tenantId, tenantId));
-      await tx.delete(siteSettings).where(eq(siteSettings.tenantId, tenantId));
-      await tx.delete(tenants).where(eq(tenants.id, tenantId));
-    }
-  });
+  await db.delete(consultationRequests).where(eq(consultationRequests.email, email));
   await pool.end();
 });
 
-test('bank transfer requires a reference and is saved as awaiting verification', async ({ page }) => {
-  await page.goto('/fr/book');
-  await page.getByLabel(/Nom et prénom/).fill('Virement Test');
-  await page.getByLabel(/Adresse e-mail/).fill(`${email}`);
-  await page.getByLabel(/Téléphone/).fill('+216 20 111 222');
-  await page.getByRole('button', { name: 'Continuer', exact: true }).click();
-  // Bank transfer is not enabled by default; the reference rule is enforced server-side regardless.
-  const payload = { fullName: 'Virement Test', email, phone: '+21620111222', service: 'contracts', amount: 150, paymentMethod: 'bank_transfer', locale: 'fr', consent: true };
-  expect((await page.request.post('/api/consultations', { headers: { 'x-forwarded-host': tenantHost }, data: payload })).status()).toBe(400);
-  const withReference = await page.request.post('/api/consultations', { headers: { 'x-forwarded-host': tenantHost }, data: { ...payload, paymentReference: 'TRF-2026-000123' } });
-  expect(withReference.status()).toBe(201);
-  const created = await withReference.json();
-  expect(created.status).toBe('awaiting_verification');
-  expect(created.reference).toMatch(/^AYL-[A-Z0-9]{16}$/);
+test("bank transfer requires a transaction reference and awaits manual verification", async ({ request }) => {
+  const payload = {
+    fullName: "Virement Test",
+    email,
+    phone: "+21620111222",
+    service: "contracts",
+    amount: 150,
+    paymentMethod: "bank_transfer",
+    locale: "fr",
+    consent: true,
+  };
+  expect((await request.post("/api/consultations", { data: { ...payload, paymentReference: "TRF-2026-000123" } })).status()).toBe(400);
+  const response = await request.post("/api/consultations", { multipart: { ...payload, paymentReference: "TRF-2026-000123", paymentProof: pngReceipt } });
+  expect(response.status()).toBe(201);
+  const created = await response.json();
+  expect(created.status).toBe("awaiting_verification");
+  expect(created.reference).toMatch(/^LAW-[A-Z0-9]{16}$/);
+  const [proof] = await db.select({ filename: paymentProofs.filename, mimeType: paymentProofs.mimeType, size: paymentProofs.size })
+    .from(paymentProofs)
+    .innerJoin(consultationRequests, eq(paymentProofs.consultationId, consultationRequests.id))
+    .where(eq(consultationRequests.reference, created.reference));
+  expect(proof).toMatchObject({ filename: "receipt.png", mimeType: "image/png", size: 8 });
 });
 
-test('D17 reference is validated and stored with the request', async ({ page }) => {
-  const base = { fullName: 'D17 Test', email, phone: '+21620111222', service: 'family', amount: 150, paymentMethod: 'd17', locale: 'fr', consent: true };
-  expect((await page.request.post('/api/consultations', { headers: { 'x-forwarded-host': tenantHost }, data: base })).status()).toBe(400);
-  const ok = await page.request.post('/api/consultations', { headers: { 'x-forwarded-host': tenantHost }, data: { ...base, paymentReference: 'D17-99887766' } });
-  expect(ok.status()).toBe(201);
-  expect((await ok.json()).status).toBe('awaiting_verification');
-  const [row] = await db.select({ paymentReference: consultationRequests.paymentReference, status: consultationRequests.status, tenantId: consultationRequests.tenantId })
-    .from(consultationRequests).where(and(eq(consultationRequests.tenantId, tenantId!), eq(consultationRequests.paymentReference, 'D17-99887766'))).limit(1);
-  expect(row?.status).toBe('awaiting_verification');
-  expect(row?.tenantId).toBe(tenantId);
-});
-
-test('a second tenant sees only its own requests', async ({ page }) => {
-  await page.goto('/admin/login');
-  await page.getByLabel('Adresse e-mail').fill(email);
-  await page.getByLabel('Mot de passe', { exact: true }).fill(password);
-  await page.getByRole('button', { name: 'Se connecter', exact: true }).click();
-  await expect(page).toHaveURL(/\/admin$/);
-  await page.goto('/admin/consultations');
-  const rows = page.locator('article.adm-item');
-  await expect(rows.filter({ hasText: 'D17-99887766' })).toHaveCount(1);
-  await expect(rows.filter({ hasText: 'Virement Test' })).toHaveCount(1);
-  await rows.filter({ hasText: 'D17-99887766' }).getByRole('button', { name: 'Vérifier et marquer payé' }).click();
-  await expect(page).toHaveURL(/verified=1/);
-  const [verified] = await db.select({ status: consultationRequests.status, verifiedAt: consultationRequests.verifiedAt })
-    .from(consultationRequests).where(and(eq(consultationRequests.tenantId, tenantId!), eq(consultationRequests.paymentReference, 'D17-99887766'))).limit(1);
-  expect(verified?.status).toBe('paid');
-  expect(verified?.verifiedAt).toBeInstanceOf(Date);
-  // Non-platform admins cannot reach the tenant manager.
-  await page.goto('/admin/tenants');
-  await expect(page).toHaveURL(/\/admin$/);
+test("D17 references are validated and stored", async ({ request }) => {
+  const payload = {
+    fullName: "D17 Test",
+    email,
+    phone: "+21620111222",
+    service: "family",
+    amount: 150,
+    paymentMethod: "d17",
+    locale: "fr",
+    consent: true,
+  };
+  expect((await request.post("/api/consultations", { data: payload })).status()).toBe(400);
+  const response = await request.post("/api/consultations", { multipart: { ...payload, paymentReference: "D17-99887766", paymentProof: pngReceipt } });
+  expect(response.status()).toBe(201);
+  expect((await response.json()).status).toBe("awaiting_verification");
+  const [row] = await db.select({ paymentReference: consultationRequests.paymentReference, status: consultationRequests.status })
+    .from(consultationRequests)
+    .where(eq(consultationRequests.paymentReference, "D17-99887766"))
+    .limit(1);
+  expect(row?.status).toBe("awaiting_verification");
+  expect(row?.paymentReference).toBe("D17-99887766");
 });

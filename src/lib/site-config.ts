@@ -1,8 +1,7 @@
-import { db } from "@/db";
+import { databaseConfigured, db } from "@/db";
 import { siteSettings } from "@/db/schema";
 import { getCmsPages, type CmsPageState, type PageKey } from "@/lib/cms";
-import { getTenant } from "@/lib/tenant";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { emailIsConfigured } from "@/lib/notifications";
 
 export type VideoKind = "file" | "embed" | "none";
@@ -65,7 +64,8 @@ export function parsePayments(settings: Record<string, string>): PaymentSettings
   return result;
 }
 
-export const DEFAULT_VIDEO = "/videos/intro.mp4";
+// No bundled video is shipped with the template. Add a licensed MP4 or approved embed in Appearance when needed.
+export const DEFAULT_VIDEO = "";
 export const defaultImages = {
   heroImage: "/images/office-tunisia.jpg",
   aboutImage: "/images/office-tunisia.jpg",
@@ -98,9 +98,9 @@ export function isSafeMediaUrl(value: string) {
 }
 
 export async function getSettingsMap(): Promise<Record<string, string>> {
+  if (!databaseConfigured) return {};
   try {
-    const tenant = await getTenant();
-    const rows = await db.select().from(siteSettings).where(eq(siteSettings.tenantId, tenant?.id ?? 1));
+    const rows = await db.select().from(siteSettings);
     return Object.fromEntries(rows.map((row) => [row.key, row.value]));
   } catch {
     return {};
@@ -109,7 +109,7 @@ export async function getSettingsMap(): Promise<Record<string, string>> {
 
 export async function getPublicSiteConfig(): Promise<PublicSiteConfig> {
   const [settings, pages] = await Promise.all([getSettingsMap(), getCmsPages()]);
-  const video = settings.introVideoUrl === undefined ? DEFAULT_VIDEO : settings.introVideoUrl;
+  const video = settings.introVideoUrl === undefined ? process.env.CABINET_INTRO_VIDEO_URL || DEFAULT_VIDEO : settings.introVideoUrl;
   const slotMinutes = Number(settings.slotMinutes);
   return {
     paymentEnabled: Boolean(process.env.KONNECT_API_KEY && process.env.KONNECT_WALLET_ID),

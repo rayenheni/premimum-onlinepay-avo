@@ -20,10 +20,10 @@ export const viewport: Viewport = { themeColor: "#3c271a", width: "device-width"
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const locale = asLocale((await params).locale);
   const config = await getPublicSiteConfig();
-  const fallbackTitle = locale === "ar" ? "أبو يحيى اللباوي — محامٍ في تونس | محاماة واستشارات قانونية" : "Abou Yahia Labbaoui — Avocat à Tunis | Conseil et représentation";
+  const fallbackTitle = locale === "ar" ? "مكتبكم القانوني — محامٍ في تونس | محاماة واستشارات قانونية" : "Votre Cabinet — Avocat à Tunis | Conseil et représentation";
   const fallbackDescription = locale === "ar"
-    ? "مكتب أبو يحيى اللباوي للمحاماة: استشارات وعقود ومرافقة قانونية للأفراد والشركات في تونس، باللغة العربية والفرنسية."
-    : "Cabinet Abou Yahia Labbaoui : conseil, contrats et contentieux pour particuliers et entreprises en Tunisie, en français et en arabe.";
+    ? "مكتبكم القانوني للمحاماة: استشارات وعقود ومرافقة قانونية للأفراد والشركات في تونس، باللغة العربية والفرنسية."
+    : "Votre Cabinet : conseil, contrats et contentieux pour particuliers et entreprises en Tunisie, en français et en arabe.";
   const managed = await cmsMetadata(locale, "home", fallbackTitle, fallbackDescription);
   return { ...managed, robots: { index: config.seoIndexing, follow: config.seoIndexing } };
 }

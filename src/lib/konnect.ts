@@ -8,11 +8,18 @@ type Consultation = typeof consultationRequests.$inferSelect;
 function credentials() {
   const apiKey = process.env.KONNECT_API_KEY;
   const walletId = process.env.KONNECT_WALLET_ID;
-  if (!apiKey || !walletId) return null;
-  const base = process.env.KONNECT_ENV === "production"
-    ? "https://api.konnect.network/api/v2"
-    : "https://api.sandbox.konnect.network/api/v2";
-  return { apiKey, walletId, base };
+  const siteUrl = process.env.SITE_URL;
+  if (!apiKey || !walletId || !siteUrl) return null;
+  try {
+    const origin = new URL(siteUrl);
+    if (!/^https?:$/.test(origin.protocol) || (process.env.NODE_ENV === "production" && origin.protocol !== "https:")) return null;
+    const base = process.env.KONNECT_ENV === "production"
+      ? "https://api.konnect.network/api/v2"
+      : "https://api.sandbox.konnect.network/api/v2";
+    return { apiKey, walletId, base, origin: origin.origin };
+  } catch {
+    return null;
+  }
 }
 
 function localPhone(phone: string) {
@@ -24,12 +31,11 @@ export function paymentIsConfigured() {
   return Boolean(credentials());
 }
 
-export async function createCheckout(consultation: Consultation, requestOrigin: string) {
+export async function createCheckout(consultation: Consultation) {
   const config = credentials();
   if (!config) return null;
 
-  const origin = process.env.SITE_URL || requestOrigin;
-  const webhook = new URL("/api/payments/konnect", origin).toString();
+  const webhook = new URL("/api/payments/konnect", config.origin).toString();
   const nameParts = consultation.fullName.split(/\s+/);
   const method = consultation.paymentMethod === "edinar"
     ? "e-DINAR"
@@ -43,7 +49,7 @@ export async function createCheckout(consultation: Consultation, requestOrigin: 
       token: "TND",
       amount: consultation.amount * 1000,
       type: "immediate",
-      description: `Consultation — Cabinet Abou Yahia Labbaoui — ${consultation.reference}`,
+      description: `Consultation — Votre Cabinet — ${consultation.reference}`,
       acceptedPaymentMethods: [method],
       lifespan: 30,
       checkoutForm: true,
@@ -115,8 +121,8 @@ export async function verifyCheckout(consultation: Consultation) {
       to: consultation.email,
       subject: consultation.locale === "ar" ? `تم تأكيد الدفع ${consultation.reference}` : `Paiement confirmé — ${consultation.reference}`,
       text: consultation.locale === "ar"
-        ? `مرحباً ${consultation.fullName}،\n\nتم التحقق من دفع ${consultation.amount} د.ت للطلب ${consultation.reference}. سيتولى المكتب تأكيد موعد الاستشارة.\n\nمكتب أبو يحيى اللباوي`
-        : `Bonjour ${consultation.fullName},\n\nLe paiement de ${consultation.amount} TND pour la demande ${consultation.reference} a été vérifié. Le cabinet vous confirmera le rendez-vous séparément.\n\nCabinet Abou Yahia Labbaoui`,
+        ? `مرحباً ${consultation.fullName}،\n\nتم التحقق من دفع ${consultation.amount} د.ت للطلب ${consultation.reference}. سيتولى المكتب تأكيد موعد الاستشارة.\n\nمكتبكم القانوني`
+        : `Bonjour ${consultation.fullName},\n\nLe paiement de ${consultation.amount} TND pour la demande ${consultation.reference} a été vérifié. Le cabinet vous confirmera le rendez-vous séparément.\n\nVotre Cabinet`,
     });
     return "paid";
   }

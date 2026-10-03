@@ -11,13 +11,14 @@ export const consultationStatuses: Record<string, string> = {
   awaiting_verification: "À vérifier (virement / D17)",
 };
 
-export const manualStatuses = ["awaiting_confirmation", "awaiting_verification", "paid", "confirmed", "completed", "cancelled"];
+// Payment completion is deliberately excluded: manual payments can only become paid via proof acceptance.
+export const manualStatuses = ["awaiting_confirmation", "awaiting_verification", "confirmed", "completed", "cancelled"];
 
 export const paymentMethods: Record<string, string> = {
   card: "Carte bancaire", edinar: "e-Dinar", konnect: "Wallet Konnect",
   bank_transfer: "Virement bancaire", d17: "D17 (La Poste)",
 };
-/** Methods that require a client-supplied reference before the admin can verify payment. */
+/** Methods that require a client-supplied reference and private receipt before the admin can verify payment. */
 export const proofRequiredMethods = new Set(["bank_transfer", "d17"]);
 
 export function serviceLabel(id: string) {

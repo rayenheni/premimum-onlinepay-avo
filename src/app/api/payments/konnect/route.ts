@@ -3,7 +3,6 @@ import { consultationRequests } from "@/db/schema";
 import { verifyCheckout } from "@/lib/konnect";
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { publicOrigin } from "@/lib/request-guard";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +17,7 @@ export async function GET(request: Request) {
     if (!consultation) return Response.json({ ok: false }, { status: 404 });
     const status = await verifyCheckout(consultation);
     if (request.headers.get("accept")?.includes("text/html")) {
-      const base = publicOrigin(request);
+      const base = process.env.SITE_URL || new URL(request.url).origin;
       const destination = new URL(`/${consultation.locale === "fr" ? "fr" : "ar"}/book`, base);
       destination.searchParams.set("reference", consultation.reference);
       return NextResponse.redirect(destination, 303);

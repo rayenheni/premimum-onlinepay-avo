@@ -2,17 +2,18 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { consultationRequests, siteSettings } from "@/db/schema";
+import { consultationRequests, paymentProofs, siteSettings } from "@/db/schema";
 import { adminHref } from "@/lib/admin-path";
 import { requireAdmin } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { allPaymentMethods } from "@/lib/site-config";
+import { proofRequiredMethods } from "@/lib/admin-labels";
 
 const text = (form: FormData, key: string, max: number) => String(form.get(key) ?? "").trim().slice(0, max);
 
-/** Enables payment methods and stores bank + D17 collection details for this tenant. */
+/** Enables payment methods and stores bank + D17 collection details for this installation. */
 export async function savePaymentSettings(formData: FormData) {
   const admin = await requireAdmin();
   const methods = allPaymentMethods.filter((method) => formData.get(`method:${method}`) === "on");
@@ -37,8 +38,8 @@ export async function savePaymentSettings(formData: FormData) {
     ["d17.instructionsFr", text(formData, "d17.instructionsFr", 600)],
   ];
   for (const [key, value] of entries) {
-    await db.insert(siteSettings).values({ tenantId: admin.tenantId, key, value })
-      .onConflictDoUpdate({ target: [siteSettings.tenantId, siteSettings.key], set: { value } });
+    await db.insert(siteSettings).values({ key, value })
+      .onConflictDoUpdate({ target: siteSettings.key, set: { value } });
   }
   await audit(admin.id, "payments.update", methods.join(","));
   revalidatePath("/", "layout");
@@ -52,17 +53,21 @@ export async function verifyConsultationPayment(formData: FormData) {
   if (!Number.isInteger(id)) return;
   const [row] = await db.select({
     id: consultationRequests.id,
+    paymentMethod: consultationRequests.paymentMethod,
     paymentReference: consultationRequests.paymentReference,
     status: consultationRequests.status,
   }).from(consultationRequests)
-    .where(and(eq(consultationRequests.tenantId, admin.tenantId), eq(consultationRequests.id, id)))
+    .where(eq(consultationRequests.id, id))
     .limit(1);
   if (!row || row.status === "paid") return;
+  if (!proofRequiredMethods.has(row.paymentMethod) || row.status !== "awaiting_verification") return;
   if (!row.paymentReference) redirect(`${await adminHref("consultations")}?error=reference`);
+  const [proof] = await db.select({ id: paymentProofs.id }).from(paymentProofs).where(eq(paymentProofs.consultationId, id)).limit(1);
+  if (!proof) redirect(`${await adminHref("consultations")}?error=proof`);
   await db.update(consultationRequests)
     .set({ status: "paid", verifiedAt: new Date() })
-    .where(and(eq(consultationRequests.tenantId, admin.tenantId), eq(consultationRequests.id, id)));
-  await audit(admin.id, "consultation.verify", String(id), row.paymentReference);
+    .where(eq(consultationRequests.id, id));
+  await audit(admin.id, "consultation.proof.accept", String(id), row.paymentReference);
   revalidatePath("/admin", "layout");
   redirect(`${await adminHref("consultations")}?verified=1`);
 }
