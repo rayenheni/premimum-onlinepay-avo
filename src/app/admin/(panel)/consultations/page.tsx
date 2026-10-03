@@ -1,5 +1,5 @@
 import { requireAdmin } from "@/lib/auth";
-import { desc, eq } from "drizzle-orm";
+import { desc } from "drizzle-orm";
 import { db } from "@/db";
 import { consultationRequests } from "@/db/schema";
 import { deleteConsultation, updateConsultationStatus } from "@/app/admin/actions";
@@ -8,8 +8,8 @@ import { ConfirmButton } from "@/components/admin/confirm-button";
 import { consultationStatuses, formatDate, manualStatuses, paymentMethods, serviceLabel } from "@/lib/admin-labels";
 
 export default async function ConsultationsPage() {
-  const admin = await requireAdmin();
-  const rows = await db.select().from(consultationRequests).where(eq(consultationRequests.tenantId, admin.tenantId)).orderBy(desc(consultationRequests.createdAt)).limit(300);
+  await requireAdmin();
+  const rows = await db.select().from(consultationRequests).orderBy(desc(consultationRequests.createdAt)).limit(300);
   return <>
     <header className="adm-header"><div><h1>Consultations</h1><p>Demandes de rendez-vous et état des paiements.</p></div></header>
     {rows.length === 0 ? <p className="adm-card adm-empty">Aucune demande de consultation pour le moment.</p> : <div className="adm-stack">{rows.map((row) => <article className="adm-card adm-item" key={row.id}>

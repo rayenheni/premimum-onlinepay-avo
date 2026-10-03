@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { count, eq } from "drizzle-orm";
 import {
   BookOpen, CalendarCheck, ClipboardList, ExternalLink, FilePenLine, GalleryHorizontal, Image,
-  Inbox, LayoutDashboard, LogOut, PanelsTopLeft, Settings, ShieldCheck, Scale, WalletCards, Building2,
+  Inbox, LayoutDashboard, LogOut, PanelsTopLeft, Settings, ShieldCheck, Scale, WalletCards,
 } from "lucide-react";
 import { db } from "@/db";
 import { cabinetInquiries, consultationRequests } from "@/db/schema";
@@ -19,7 +19,6 @@ export default async function PanelLayout({ children }: { children: ReactNode })
     db.select({ value: count() }).from(consultationRequests).where(eq(consultationRequests.status, "awaiting_confirmation")),
   ]);
   const links = [
-    ...(admin.isPlatform ? [{ href: `${base}/tenants`, label: "Sites clients", Icon: Building2, badge: 0 }] : []),
     { href: base, label: "Tableau de bord", Icon: LayoutDashboard, badge: 0 },
     { href: `${base}/consultations`, label: "Consultations", Icon: CalendarCheck, badge: toConfirm.value },
     { href: `${base}/messages`, label: "Messages", Icon: Inbox, badge: newMessages.value },
@@ -34,7 +33,7 @@ export default async function PanelLayout({ children }: { children: ReactNode })
   ];
   return <div className="adm-shell">
     <aside className="adm-sidebar">
-      <div className="adm-brand"><span><Scale size={22} /></span><div><strong>Cabinet Labbaoui</strong><small>Administration CMS</small></div></div>
+      <div className="adm-brand"><span><Scale size={22} /></span><div><strong>Votre Cabinet</strong><small>Administration CMS</small></div></div>
       <nav>{links.map(({ href, label, Icon, badge }) => <Link key={href} href={href}><Icon size={19} />{label}{badge > 0 && <em>{badge}</em>}</Link>)}</nav>
       <div className="adm-sidebar-footer"><Link href="/ar" target="_blank"><ExternalLink size={17} />Voir le site</Link><Link href="/api/admin/export?type=backup"><ClipboardList size={17} />Exporter le contenu</Link><p>{admin.email}</p>
         <form action={logoutAction}><button type="submit" className="adm-logout"><LogOut size={17} />Déconnexion</button></form></div>

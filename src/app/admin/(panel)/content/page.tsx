@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { desc } from "drizzle-orm";
 import { db } from "@/db";
 import { contentRevisions } from "@/db/schema";
 import { resetContent, restoreContentRevision, saveContent } from "@/app/admin/actions";
@@ -16,11 +16,11 @@ const labels: Record<string, string> = {
 };
 
 export default async function ContentPage({ searchParams }: { searchParams: Promise<{ saved?: string; restored?: string; reset?: string }> }) {
-  const admin = await requireAdmin();
+  await requireAdmin();
   const status = await searchParams;
   const [ar, fr, extraAr, extraFr, revisions] = await Promise.all([
     getSiteContent("ar"), getSiteContent("fr"), getExtraContent("ar"), getExtraContent("fr"),
-    db.select().from(contentRevisions).where(eq(contentRevisions.tenantId, admin.tenantId)).orderBy(desc(contentRevisions.createdAt)).limit(12),
+    db.select().from(contentRevisions).orderBy(desc(contentRevisions.createdAt)).limit(12),
   ]);
   const entries = [
     ...flattenEditableContent(ar).map((item) => ({ namespace: "content", path: item.path })),

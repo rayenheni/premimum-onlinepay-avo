@@ -1,8 +1,7 @@
 import { notFound } from "next/navigation";
-import { and, eq } from "drizzle-orm";
-import { db } from "@/db";
+import { eq } from "drizzle-orm";
+import { databaseConfigured, db } from "@/db";
 import { cmsPages, siteSettings } from "@/db/schema";
-import { getTenant } from "@/lib/tenant";
 import { siteContent, type Locale } from "@/lib/site-content";
 import { extra } from "@/lib/site-content-extra";
 
@@ -81,9 +80,9 @@ export function getValueAtPath(value: unknown, path: string): string | number | 
   return typeof cursor === "string" || typeof cursor === "number" ? cursor : undefined;
 }
 
-export async function getContentOverrides(locale: Locale): Promise<Record<string, string | number>> {
-  const tenant = await getTenant();
-  const [row] = await db.select().from(siteSettings).where(and(eq(siteSettings.tenantId, tenant?.id ?? 1), eq(siteSettings.key, `contentOverrides:${locale}`))).limit(1);
+async function getOverrides(key: string): Promise<Record<string, string | number>> {
+  if (!databaseConfigured) return {};
+  const [row] = await db.select().from(siteSettings).where(eq(siteSettings.key, key)).limit(1);
   if (!row) return {};
   try {
     const parsed = JSON.parse(row.value) as Record<string, unknown>;
@@ -91,6 +90,10 @@ export async function getContentOverrides(locale: Locale): Promise<Record<string
   } catch {
     return {};
   }
+}
+
+export async function getContentOverrides(locale: Locale) {
+  return getOverrides(`contentOverrides:${locale}`);
 }
 
 export async function getSiteContent(locale: Locale): Promise<SiteContent> {
@@ -100,16 +103,8 @@ export async function getSiteContent(locale: Locale): Promise<SiteContent> {
   return content;
 }
 
-export async function getExtraOverrides(locale: Locale): Promise<Record<string, string | number>> {
-  const tenant = await getTenant();
-  const [row] = await db.select().from(siteSettings).where(and(eq(siteSettings.tenantId, tenant?.id ?? 1), eq(siteSettings.key, `extraOverrides:${locale}`))).limit(1);
-  if (!row) return {};
-  try {
-    const parsed = JSON.parse(row.value) as Record<string, unknown>;
-    return Object.fromEntries(Object.entries(parsed).filter(([, value]) => typeof value === "string" || typeof value === "number")) as Record<string, string | number>;
-  } catch {
-    return {};
-  }
+export async function getExtraOverrides(locale: Locale) {
+  return getOverrides(`extraOverrides:${locale}`);
 }
 
 export async function getExtraContent(locale: Locale): Promise<ExtraContent> {
@@ -133,9 +128,9 @@ function defaultPage(key: PageKey): CmsPageState {
 }
 
 export async function getCmsPages(): Promise<Record<PageKey, CmsPageState>> {
-  const tenant = await getTenant();
-  const rows = await db.select().from(cmsPages).where(eq(cmsPages.tenantId, tenant?.id ?? 1));
   const result = Object.fromEntries(pageDefinitions.map((definition) => [definition.key, defaultPage(definition.key)])) as Record<PageKey, CmsPageState>;
+  if (!databaseConfigured) return result;
+  const rows = await db.select().from(cmsPages);
   for (const row of rows) {
     if (!(row.key in result)) continue;
     const key = row.key as PageKey;

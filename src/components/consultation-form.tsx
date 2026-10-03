@@ -41,8 +41,6 @@ export function ConsultationForm({ locale, config, content, initialService = "ge
     }
     return slots;
   })();
-  useEffect(() => { setToday(new Date().toISOString().slice(0, 10)); }, []);
-
   function update(field: keyof typeof form, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
   }

@@ -6,9 +6,8 @@ import { consultationRequests } from "@/db/schema";
 import { getSiteContent } from "@/lib/cms";
 import { createCheckout, paymentIsConfigured } from "@/lib/konnect";
 import { sendEmail } from "@/lib/notifications";
-import { publicOrigin, rateLimited } from "@/lib/request-guard";
+import { rateLimited } from "@/lib/request-guard";
 import { getPublicSiteConfig, allPaymentMethods, type PaymentMethod } from "@/lib/site-config";
-import { getTenant } from "@/lib/tenant";
 import { proofRequiredMethods } from "@/lib/admin-labels";
 
 export const dynamic = "force-dynamic";
@@ -34,9 +33,9 @@ export async function POST(request: Request) {
   if (!body || typeof body !== "object" || Array.isArray(body)) return Response.json({ ok: false, message: "Invalid request" }, { status: 400 });
 
   const locale = body.locale === "fr" ? "fr" : "ar";
-  const [content, config, tenant] = await Promise.all([getSiteContent(locale), getPublicSiteConfig(), getTenant()]);
+  const [content, config] = await Promise.all([getSiteContent(locale), getPublicSiteConfig()]);
   const amounts = new Set(content.booking.formats.map((format) => Number(format.value)).filter((amount) => Number.isInteger(amount) && amount > 0));
-  // Only methods enabled for this tenant are accepted, and the amount must match an approved tariff.
+  // Only methods enabled in this installation are accepted, and the amount must match an approved tariff.
   const methods = new Set<PaymentMethod>(config.payments.methods);
 
   const fullName = clean(body.fullName, 140);
@@ -66,10 +65,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    const reference = `AYL-${randomUUID().replace(/-/g, "").slice(0, 16).toUpperCase()}`;
+    const reference = `LAW-${randomUUID().replace(/-/g, "").slice(0, 16).toUpperCase()}`;
     const status = proofRequired ? "awaiting_verification" : paymentIsConfigured() ? "payment_pending" : "awaiting_confirmation";
     const [created] = await db.insert(consultationRequests).values({
-      tenantId: tenant?.id ?? 1,
       reference, fullName, email, phone, service, preferredDate: preferredDate || null, preferredTime: preferredTime || null,
       message: message || null, locale, paymentMethod, amount,
       paymentReference: proofRequired ? proofReference : null,
@@ -89,14 +87,14 @@ export async function POST(request: Request) {
         to: email,
         subject: locale === "ar" ? `تم استلام طلبكم ${reference}` : `Votre demande a été reçue — ${reference}`,
         text: locale === "ar"
-          ? `مرحباً ${fullName}،\n\nتم تسجيل طلب استشارتكم تحت المرجع ${reference}. سيؤكد المكتب الموعد بعد مراجعة الطلب.\n\nمكتب أبو يحيى اللباوي`
-          : `Bonjour ${fullName},\n\nVotre demande de consultation est enregistrée sous la référence ${reference}. Le cabinet confirmera le rendez-vous après examen.\n\nCabinet Abou Yahia Labbaoui`,
+          ? `مرحباً ${fullName}،\n\nتم تسجيل طلب استشارتكم تحت المرجع ${reference}. سيؤكد المكتب الموعد بعد مراجعة الطلب.\n\nمكتبكم القانوني`
+          : `Bonjour ${fullName},\n\nVotre demande de consultation est enregistrée sous la référence ${reference}. Le cabinet confirmera le rendez-vous après examen.\n\nVotre Cabinet`,
       });
     });
 
     if (!proofRequired && paymentIsConfigured()) {
       try {
-        const checkout = await createCheckout(created, publicOrigin(request));
+        const checkout = await createCheckout(created);
         if (checkout) return Response.json({ ok: true, reference, status: "payment_pending", payUrl: checkout.payUrl }, { status: 201 });
       } catch (error) {
         console.error("Konnect initialization failed", error instanceof Error ? error.message : "Unknown error");

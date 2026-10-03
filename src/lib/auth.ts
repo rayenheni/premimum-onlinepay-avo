@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { eq, lt } from "drizzle-orm";
 import { db } from "@/db";
 import { adminSessions, adminUsers } from "@/db/schema";
-import { getTenant } from "@/lib/tenant";
 import { adminHref } from "@/lib/admin-path";
 
 const COOKIE = "cabinet_admin";
@@ -28,9 +27,13 @@ export async function createSession(adminId: number) {
   await db.delete(adminSessions).where(lt(adminSessions.expiresAt, new Date()));
   const token = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  await db.insert(adminSessions).values({ tokenHash: sha(token), adminId, expiresAt });
+  (await db.insert(adminSessions).values({ tokenHash: sha(token), adminId, expiresAt }));
   (await cookies()).set(COOKIE, token, {
-    httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", expires: expiresAt,
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    expires: expiresAt,
   });
 }
 
@@ -38,25 +41,18 @@ export async function getAdmin() {
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return null;
   const [row] = await db
-    .select({ id: adminUsers.id, email: adminUsers.email, tenantId: adminUsers.tenantId, isPlatform: adminUsers.isPlatform, expiresAt: adminSessions.expiresAt })
+    .select({ id: adminUsers.id, email: adminUsers.email, expiresAt: adminSessions.expiresAt })
     .from(adminSessions)
     .innerJoin(adminUsers, eq(adminUsers.id, adminSessions.adminId))
     .where(eq(adminSessions.tokenHash, sha(token)))
     .limit(1);
   if (!row || row.expiresAt < new Date()) return null;
-  return { id: row.id, email: row.email, tenantId: row.tenantId, isPlatform: row.isPlatform };
+  return { id: row.id, email: row.email };
 }
 
 export async function requireAdmin() {
   const admin = await getAdmin();
   if (!admin) redirect(await adminHref("login"));
-  return admin;
-}
-
-/** Platform owner: can provision new lawyer tenants. Never granted by tenant admins. */
-export async function requirePlatformAdmin() {
-  const admin = await requireAdmin();
-  if (!admin.isPlatform) redirect(await adminHref());
   return admin;
 }
 

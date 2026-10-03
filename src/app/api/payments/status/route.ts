@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const reference = new URL(request.url).searchParams.get("reference") || "";
-  if (!/^AYL-[A-Z0-9]{7,16}$/.test(reference)) {
+  if (!/^LAW-[A-Z0-9]{7,16}$/.test(reference)) {
     return Response.json({ ok: false }, { status: 400 });
   }
   try {

@@ -14,7 +14,7 @@ export default async function AdminLoginPage() {
   return <main className="adm-login"><div className="adm-login-card">
     <span className="adm-login-icon"><Scale size={28} /></span>
     <h1>{setup ? "Première installation" : "Espace d’administration"}</h1>
-    <p>{setup ? "Créez le compte administrateur du cabinet. Cette étape n’est disponible qu’une seule fois." : "Cabinet Abou Yahia Labbaoui — accès réservé."}</p>
+    <p>{setup ? "Créez le compte administrateur du cabinet. Cette étape n’est disponible qu’une seule fois." : "Votre Cabinet — accès réservé."}</p>
     <LoginForm mode={setup ? "setup" : "login"} needsKey={Boolean(process.env.ADMIN_SETUP_KEY)} />
   </div></main>;
 }

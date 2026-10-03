@@ -7,7 +7,7 @@ export function asLocale(value: string): Locale {
 }
 
 export function titleFor(locale: Locale, label: string) {
-  return `${label} — ${locale === "ar" ? "أبو يحيى اللباوي" : "Cabinet Labbaoui"}`;
+  return `${label} — ${locale === "ar" ? "مكتبكم القانوني" : "Votre Cabinet"}`;
 }
 
 export function normalize(value: string) {

@@ -22,7 +22,7 @@ export default async function BookPage({ params, searchParams }: Props) {
   const b = (await getExtraContent(locale)).booking;
   const config = await getPublicSiteConfig();
   const service = query.service && (serviceIds.includes(query.service) || query.service === "general") ? query.service : "general";
-  const reference = query.reference && /^AYL-[A-Z0-9]{7,16}$/.test(query.reference) ? query.reference : undefined;
+  const reference = query.reference && /^LAW-[A-Z0-9]{7,16}$/.test(query.reference) ? query.reference : undefined;
   return <>
     <PageHero locale={locale} title={t.booking.title} description={t.booking.description} content={t} crumbs={[{ label: t.booking.title }]} />
     <section className="page-section section-space"><div className="container contact-layout booking-layout">

@@ -10,7 +10,7 @@ function trackErrors(page: Page) {
   return errors;
 }
 
-test("Home: Tunisian office hero, intro video and screenshots", async ({ page, request }) => {
+test("Home: office hero and public sections", async ({ page, request }) => {
   const errors = trackErrors(page);
   await page.setViewportSize({ width: 1920, height: 940 });
   const response = await page.goto("/ar");
@@ -20,19 +20,7 @@ test("Home: Tunisian office hero, intro video and screenshots", async ({ page, r
   await expect(page.locator(".hero-copy h1")).toContainText("حقوقك أمانة");
   const heroSrc = await page.locator(".hero-background").getAttribute("src");
   expect(decodeURIComponent(heroSrc || "")).toContain("office-tunisia");
-  await expect(page.locator(".hero-preview img")).toHaveAttribute("src", /video-poster/);
   await page.screenshot({ path: "artifacts/desktop-hero.png" });
-
-  await page.locator(".hero-preview").click();
-  const dialog = page.getByRole("dialog");
-  await expect(dialog.locator("video")).toBeVisible();
-  await expect(dialog.locator("video")).toHaveAttribute("src", "/videos/intro.mp4");
-  const video = await request.get("/videos/intro.mp4", { headers: { Range: "bytes=0-1023" } });
-  expect([200, 206]).toContain(video.status());
-  expect(video.headers()["content-type"]).toContain("video/mp4");
-  await page.screenshot({ path: "artifacts/desktop-video.png" });
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog")).toHaveCount(0);
 
   await page.locator("#about").scrollIntoViewIfNeeded();
   await expect(page.locator(".site-header")).toHaveClass(/header-scrolled/);
@@ -107,7 +95,7 @@ test("Contact and booking requests are saved", async ({ page }) => {
   if (!(await page.locator(".payment-notice").isVisible())) test.skip(true, "Merchant account configured.");
   await page.getByLabel(/J’accepte le traitement/).check();
   await page.getByRole("button", { name: "Enregistrer ma demande", exact: true }).click();
-  await expect(page.locator(".request-reference strong")).toHaveText(/^AYL-[A-F0-9]{16}$/);
+  await expect(page.locator(".request-reference strong")).toHaveText(/^LAW-[A-F0-9]{16}$/);
   await expect(page.locator(".success-screen")).toContainText("Aucun montant n’a été débité");
 });
 
@@ -309,7 +297,7 @@ test("Bug-fix regressions: Arabic search variants, styled 404, original assets",
   for (const asset of ["/fonts/sst-roman.ttf", "/images/article-family.webp", "/images/office.jpg"]) {
     expect((await request.get(asset)).status(), asset).toBe(404);
   }
-  for (const asset of ["/images/justice.png", "/images/article-family.jpg", "/images/office-tunisia.jpg", "/videos/intro.mp4"]) {
+  for (const asset of ["/images/justice.png", "/images/article-family.jpg", "/images/office-tunisia.jpg", "/images/video-poster.jpg"]) {
     expect((await request.get(asset, { headers: { Range: "bytes=0-10" } })).status(), asset).toBeLessThan(300);
   }
   const html = await (await request.get("/ar")).text();

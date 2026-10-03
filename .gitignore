@@ -1,0 +1,24 @@
+# Dependencies and build output
+node_modules/
+.next/
+out/
+build/
+dist/
+coverage/
+
+# Generated TypeScript build cache
+*.tsbuildinfo
+
+# Local environment and database tooling
+.env
+.env.local
+.env.*.local
+
+# Test artifacts
+playwright-report/
+test-results/
+artifacts/
+
+# OS/editor files
+.DS_Store
+*.swp

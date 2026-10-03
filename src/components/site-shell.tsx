@@ -69,7 +69,7 @@ export function SiteShell({ locale, config, content, children }: { locale: Local
 
   function share(channel: "facebook" | "linkedin" | "email") {
     const url = encodeURIComponent(window.location.href);
-    if (channel === "email") { window.location.href = `mailto:?subject=Cabinet%20Abou%20Yahia%20Labbaoui&body=${url}`; return; }
+    if (channel === "email") { window.location.assign(`mailto:?subject=Votre%20cabinet&body=${url}`); return; }
     window.open(channel === "facebook" ? `https://www.facebook.com/sharer/sharer.php?u=${url}` : `https://www.linkedin.com/sharing/share-offsite/?url=${url}`, "_blank", "noopener,noreferrer");
   }
   const headerSolid = scrolled || mobileMenu;
