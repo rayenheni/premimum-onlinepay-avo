@@ -76,6 +76,17 @@ export const contentRevisions = pgTable("content_revisions", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** Private receipt uploaded by a client for a manual payment. */
+export const paymentProofs = pgTable("payment_proofs", {
+  id: serial("id").primaryKey(),
+  consultationId: integer("consultation_id").notNull().unique().references(() => consultationRequests.id, { onDelete: "cascade" }),
+  filename: varchar("filename", { length: 180 }).notNull(),
+  mimeType: varchar("mime_type", { length: 80 }).notNull(),
+  size: integer("size").notNull(),
+  data: bytea("data").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const articles = pgTable("articles", {
   id: serial("id").primaryKey(),
   slug: varchar("slug", { length: 120 }).notNull().unique(),

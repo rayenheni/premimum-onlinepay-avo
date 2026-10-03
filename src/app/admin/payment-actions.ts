@@ -4,11 +4,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { consultationRequests, siteSettings } from "@/db/schema";
+import { consultationRequests, paymentProofs, siteSettings } from "@/db/schema";
 import { adminHref } from "@/lib/admin-path";
 import { requireAdmin } from "@/lib/auth";
 import { audit } from "@/lib/audit";
 import { allPaymentMethods } from "@/lib/site-config";
+import { proofRequiredMethods } from "@/lib/admin-labels";
 
 const text = (form: FormData, key: string, max: number) => String(form.get(key) ?? "").trim().slice(0, max);
 
@@ -52,17 +53,21 @@ export async function verifyConsultationPayment(formData: FormData) {
   if (!Number.isInteger(id)) return;
   const [row] = await db.select({
     id: consultationRequests.id,
+    paymentMethod: consultationRequests.paymentMethod,
     paymentReference: consultationRequests.paymentReference,
     status: consultationRequests.status,
   }).from(consultationRequests)
     .where(eq(consultationRequests.id, id))
     .limit(1);
   if (!row || row.status === "paid") return;
+  if (!proofRequiredMethods.has(row.paymentMethod) || row.status !== "awaiting_verification") return;
   if (!row.paymentReference) redirect(`${await adminHref("consultations")}?error=reference`);
+  const [proof] = await db.select({ id: paymentProofs.id }).from(paymentProofs).where(eq(paymentProofs.consultationId, id)).limit(1);
+  if (!proof) redirect(`${await adminHref("consultations")}?error=proof`);
   await db.update(consultationRequests)
     .set({ status: "paid", verifiedAt: new Date() })
     .where(eq(consultationRequests.id, id));
-  await audit(admin.id, "consultation.verify", String(id), row.paymentReference);
+  await audit(admin.id, "consultation.proof.accept", String(id), row.paymentReference);
   revalidatePath("/admin", "layout");
   redirect(`${await adminHref("consultations")}?verified=1`);
 }

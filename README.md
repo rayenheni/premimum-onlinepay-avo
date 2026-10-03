@@ -66,7 +66,7 @@ Set all three server variables below to enable online checkout:
 
 ### Bank transfer and D17
 
-These methods are manual by design. The client provides a transaction reference, the request is stored as `awaiting_verification`, and the firm verifies it in its own bank/D17 account before marking it paid in the admin panel.
+These methods are manual by design. The client provides a transaction reference **and uploads a payment receipt** (JPG, PNG, WebP or PDF; 5 MB maximum). The receipt is stored privately, the request is set to `awaiting_verification`, and the firm opens the proof in **Admin → Consultations** before choosing **Accepter la preuve et marquer payé**. Proof files are never exposed through the public media route.
 
 ## Media and assets
 

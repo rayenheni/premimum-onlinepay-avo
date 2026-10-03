@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { ArrowLeft, ArrowRight, Banknote, Check, CheckCircle2, ChevronLeft, ChevronRight, Copy, CreditCard, Info, Landmark, LoaderCircle, LockKeyhole, Mail, ShieldCheck, Smartphone, Wallet } from "lucide-react";
 import { type Locale } from "@/lib/site-content";
 import type { SiteContent } from "@/lib/cms";
@@ -17,9 +17,10 @@ export function ConsultationForm({ locale, config, content, initialService = "ge
   const [reference, setReference] = useState("");
   const [status, setStatus] = useState("");
   const [copied, setCopied] = useState(false);
-  const [today, setToday] = useState("");
+  const [today] = useState(() => new Date().toISOString().slice(0, 10));
   const [form, setForm] = useState({ fullName: "", email: "", phone: "", service: initialService, preferredDate: "", preferredTime: "", message: "", website: "" });
   const [paymentReference, setPaymentReference] = useState("");
+  const [paymentProof, setPaymentProof] = useState<File | null>(null);
   const Arrow = locale === "ar" ? ArrowLeft : ArrowRight;
   const bank = config.payments.bank;
   const d17 = config.payments.d17;
@@ -51,10 +52,16 @@ export function ConsultationForm({ locale, config, content, initialService = "ge
     if (loading) return;
     setLoading(true); setError("");
     try {
-      const response = await fetch("/api/consultations", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, paymentReference, amount, paymentMethod, locale, consent }),
-      });
+      const payload = { ...form, paymentReference, amount, paymentMethod, locale, consent };
+      const request = needsProof
+        ? (() => {
+          const data = new FormData();
+          Object.entries(payload).forEach(([key, value]) => data.append(key, String(value)));
+          if (paymentProof) data.append("paymentProof", paymentProof);
+          return { body: data };
+        })()
+        : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) };
+      const response = await fetch("/api/consultations", { method: "POST", ...request });
       const result = await response.json() as { ok: boolean; reference?: string; status?: string; payUrl?: string; message?: string };
       if (!response.ok || !result.ok || !result.reference) throw new Error(result.message || t.booking.error);
       if (result.payUrl) {
@@ -105,6 +112,7 @@ export function ConsultationForm({ locale, config, content, initialService = "ge
           {paymentMethod === "bank_transfer" ? <div className="payment-instructions"><h4><Landmark size={19} />{t.booking.bankTransfer}</h4><dl><div><dt>{t.booking.bankName}</dt><dd dir="ltr">{bank.name || "—"}</dd></div><div><dt>{t.booking.bankBeneficiary}</dt><dd>{bank.beneficiary || "—"}</dd></div><div><dt>{t.booking.bankRib}</dt><dd dir="ltr" className="payment-rib">{bank.rib || "—"}</dd></div></dl>{bank.instructionsFr && <p>{locale === "ar" ? bank.instructionsAr || bank.instructionsFr : bank.instructionsFr}</p>}</div>
             : <div className="payment-instructions"><h4><Smartphone size={19} />{t.booking.d17}</h4><dl><div><dt>{t.booking.d17Phone}</dt><dd dir="ltr">{d17.phone || "—"}</dd></div><div><dt>{t.booking.d17MerchantCode}</dt><dd dir="ltr">{d17.merchantCode || "—"}</dd></div></dl>{d17.instructionsFr && <p>{locale === "ar" ? d17.instructionsAr || d17.instructionsFr : d17.instructionsFr}</p>}</div>}
           <label className="field-wide"><span>{t.booking.paymentReference} <i>*</i></span><input required minLength={4} maxLength={120} dir="ltr" value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} placeholder={paymentMethod === "d17" ? t.booking.d17ReferencePlaceholder : t.booking.bankReferencePlaceholder} /><small>{t.booking.paymentReferenceHint}</small></label>
+          <label className="field-wide"><span>{t.booking.paymentProofFile} <i>*</i></span><input required type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={(event) => setPaymentProof(event.target.files?.[0] || null)} /><small>{t.booking.paymentProofFileHint}</small></label>
           <p className="payment-proof-note"><Info size={17} />{t.booking.proofNote}</p>
         </div>}
         <label className="consent-line"><input type="checkbox" required checked={consent} onChange={(event) => setConsent(event.target.checked)} /><span>{t.booking.consent}</span></label>

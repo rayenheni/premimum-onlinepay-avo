@@ -8,6 +8,13 @@
       "when": 1791014744362,
       "tag": "0000_sparkling_skin",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791018486769,
+      "tag": "0001_smiling_azazel",
+      "breakpoints": true
     }
   ]
 }

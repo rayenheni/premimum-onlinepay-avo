@@ -2,9 +2,10 @@ import "dotenv/config";
 import { test, expect } from "@playwright/test";
 import { eq } from "drizzle-orm";
 import { db, pool } from "../src/db";
-import { consultationRequests, siteSettings } from "../src/db/schema";
+import { consultationRequests, paymentProofs, siteSettings } from "../src/db/schema";
 
 const email = `e2e-payment-${Date.now()}@example.tn`;
+const pngReceipt = { name: "receipt.png", mimeType: "image/png", buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]) };
 
 async function setting(key: string, value: string) {
   await db.insert(siteSettings).values({ key, value }).onConflictDoUpdate({ target: siteSettings.key, set: { value } });
@@ -34,12 +35,17 @@ test("bank transfer requires a transaction reference and awaits manual verificat
     locale: "fr",
     consent: true,
   };
-  expect((await request.post("/api/consultations", { data: payload })).status()).toBe(400);
-  const response = await request.post("/api/consultations", { data: { ...payload, paymentReference: "TRF-2026-000123" } });
+  expect((await request.post("/api/consultations", { data: { ...payload, paymentReference: "TRF-2026-000123" } })).status()).toBe(400);
+  const response = await request.post("/api/consultations", { multipart: { ...payload, paymentReference: "TRF-2026-000123", paymentProof: pngReceipt } });
   expect(response.status()).toBe(201);
   const created = await response.json();
   expect(created.status).toBe("awaiting_verification");
   expect(created.reference).toMatch(/^LAW-[A-Z0-9]{16}$/);
+  const [proof] = await db.select({ filename: paymentProofs.filename, mimeType: paymentProofs.mimeType, size: paymentProofs.size })
+    .from(paymentProofs)
+    .innerJoin(consultationRequests, eq(paymentProofs.consultationId, consultationRequests.id))
+    .where(eq(consultationRequests.reference, created.reference));
+  expect(proof).toMatchObject({ filename: "receipt.png", mimeType: "image/png", size: 8 });
 });
 
 test("D17 references are validated and stored", async ({ request }) => {
@@ -54,7 +60,7 @@ test("D17 references are validated and stored", async ({ request }) => {
     consent: true,
   };
   expect((await request.post("/api/consultations", { data: payload })).status()).toBe(400);
-  const response = await request.post("/api/consultations", { data: { ...payload, paymentReference: "D17-99887766" } });
+  const response = await request.post("/api/consultations", { multipart: { ...payload, paymentReference: "D17-99887766", paymentProof: pngReceipt } });
   expect(response.status()).toBe(201);
   expect((await response.json()).status).toBe("awaiting_verification");
   const [row] = await db.select({ paymentReference: consultationRequests.paymentReference, status: consultationRequests.status })
